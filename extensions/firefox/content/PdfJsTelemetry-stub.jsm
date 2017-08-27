@@ -1,4 +1,4 @@
-/* Copyright 2012 Mozilla Foundation
+/* Copyright 2013 Mozilla Foundation
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,18 +13,31 @@
  * limitations under the License.
  */
 
-'use strict';
+"use strict";
 
-var fs = require('fs');
+this.EXPORTED_SYMBOLS = ["PdfJsTelemetry"];
 
-function normalizeText(s) {
- return s.replace(/\r\n?/g, '\n').replace(/\uFEFF/g, '');
-}
-
-var args = process.argv.slice(2);
-
-args.forEach(function (file) {
-  var content = fs.readFileSync(file, 'utf8');
-  content = normalizeText(content);
-  fs.writeFileSync(file, content, 'utf8');
-});
+this.PdfJsTelemetry = {
+  onViewerIsUsed() {
+  },
+  onFallback() {
+  },
+  onDocumentSize(size) {
+  },
+  onDocumentVersion(versionId) {
+  },
+  onDocumentGenerator(generatorId) {
+  },
+  onEmbed(isObject) {
+  },
+  onFontType(fontTypeId) {
+  },
+  onForm(isAcroform) {
+  },
+  onPrint() {
+  },
+  onStreamType(streamTypeId) {
+  },
+  onTimeToView(ms) {
+  },
+};

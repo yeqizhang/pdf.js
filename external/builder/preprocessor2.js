@@ -1,6 +1,6 @@
 'use strict';
 
-var esprima = require('esprima');
+var acorn = require('acorn');
 var escodegen = require('escodegen');
 var vm = require('vm');
 var fs = require('fs');
@@ -22,7 +22,7 @@ function evalWithDefines(code, defines, loc) {
   if (!code || !code.trim()) {
     throw new Error('No JavaScript expression given');
   }
-  return vm.runInNewContext(code, defines, {displayErrors: false});
+  return vm.runInNewContext(code, defines, { displayErrors: false, });
 }
 
 function handlePreprocessorAction(ctx, actionName, args, loc) {
@@ -36,7 +36,7 @@ function handlePreprocessorAction(ctx, actionName, args, loc) {
           throw new Error('No code for testing is given');
         }
         var isTrue = !!evalWithDefines(arg.value, ctx.defines);
-        return {type: 'Literal', value: isTrue, loc: loc};
+        return { type: 'Literal', value: isTrue, loc: loc, };
       case 'eval':
         arg = args[0];
         if (!arg || arg.type !== 'Literal' ||
@@ -46,10 +46,10 @@ function handlePreprocessorAction(ctx, actionName, args, loc) {
         var result = evalWithDefines(arg.value, ctx.defines);
         if (typeof result === 'boolean' || typeof result === 'string' ||
             typeof result === 'number') {
-          return {type: 'Literal', value: result, loc: loc};
+          return { type: 'Literal', value: result, loc: loc, };
         }
         if (typeof result === 'object') {
-          var parsedObj = esprima.parse('(' + JSON.stringify(result) + ')');
+          var parsedObj = acorn.parse('(' + JSON.stringify(result) + ')');
           parsedObj.body[0].expression.loc = loc;
           return parsedObj.body[0].expression;
         }
@@ -66,7 +66,7 @@ function handlePreprocessorAction(ctx, actionName, args, loc) {
                                jsonPath.substring(ROOT_PREFIX.length));
         }
         var jsonContent = fs.readFileSync(jsonPath).toString();
-        var parsedJSON = esprima.parse('(' + jsonContent + ')');
+        var parsedJSON = acorn.parse('(' + jsonContent + ')');
         parsedJSON.body[0].expression.loc = loc;
         return parsedJSON.body[0].expression;
     }
@@ -80,13 +80,21 @@ function handlePreprocessorAction(ctx, actionName, args, loc) {
 
 function postprocessNode(ctx, node) {
   switch (node.type) {
+    case 'ExportNamedDeclaration':
+    case 'ImportDeclaration':
+      if (node.source && node.source.type === 'Literal' &&
+          ctx.map && ctx.map[node.source.value]) {
+        var newValue = ctx.map[node.source.value];
+        node.source.value = node.source.raw = newValue;
+      }
+      break;
     case 'IfStatement':
       if (isLiteral(node.test, true)) {
         // if (true) stmt1; => stmt1
         return node.consequent;
       } else if (isLiteral(node.test, false)) {
         // if (false) stmt1; else stmt2; => stmt2
-        return node.alternate || {type: 'EmptyStatement', loc: node.loc};
+        return node.alternate || { type: 'EmptyStatement', loc: node.loc, };
       }
       break;
     case 'ConditionalExpression':
@@ -102,13 +110,13 @@ function postprocessNode(ctx, node) {
       if (node.operator === 'typeof' &&
           isPDFJSPreprocessor(node.argument)) {
         // typeof PDFJSDev => 'object'
-        return {type: 'Literal', value: 'object', loc: node.loc};
+        return { type: 'Literal', value: 'object', loc: node.loc, };
       }
       if (node.operator === '!' &&
           node.argument.type === 'Literal' &&
           typeof node.argument.value === 'boolean') {
         // !true => false,  !false => true
-        return {type: 'Literal', value: !node.argument.value, loc: node.loc};
+        return { type: 'Literal', value: !node.argument.value, loc: node.loc, };
       }
       break;
     case 'LogicalExpression':
@@ -149,7 +157,7 @@ function postprocessNode(ctx, node) {
                  return {
                    type: 'Literal',
                    value: (node.operator[0] === '=') === equal,
-                   loc: node.loc
+                   loc: node.loc,
                  };
              }
           }
@@ -164,6 +172,13 @@ function postprocessNode(ctx, node) {
         var action = node.callee.property.name;
         return handlePreprocessorAction(ctx, action,
                                         node.arguments, node.loc);
+      }
+      // require('string')
+      if (node.callee.type === 'Identifier' && node.callee.name === 'require' &&
+          node.arguments.length === 1 && node.arguments[0].type === 'Literal' &&
+          ctx.map && ctx.map[node.arguments[0].value]) {
+        var requireName = node.arguments[0];
+        requireName.value = requireName.raw = ctx.map[requireName.value];
       }
       break;
     case 'BlockStatement':
@@ -214,7 +229,7 @@ function fixComments(ctx, node) {
   // Removes ESLint and other service comments.
   if (node.leadingComments) {
     var CopyrightRegExp = /\bcopyright\b/i;
-    var BlockCommentRegExp = /^\s*(globals|eslint|falls through|umdutils)\b/;
+    var BlockCommentRegExp = /^\s*(globals|eslint|falls through)\b/;
     var LineCommentRegExp = /^\s*eslint\b/;
 
     var i = 0;
@@ -267,23 +282,23 @@ function traverseTree(ctx, node) {
 }
 
 function preprocessPDFJSCode(ctx, code) {
-  var saveComments = !!ctx.saveComments;
   var format = ctx.format || {
     indent: {
       style: ' ',
-      adjustMultilineComment: saveComments,
-    }
+    },
   };
-  var parseComment = {
-    loc: true,
-    attachComment: saveComments
+  var parseOptions = {
+    locations: true,
+    sourceFile: ctx.sourceFile,
+    sourceType: 'module',
   };
   var codegenOptions = {
     format: format,
-    comment: saveComments,
-    parse: esprima.parse
+    parse: acorn.parse,
+    sourceMap: ctx.sourceMap,
+    sourceMapWithCode: ctx.sourceMap,
   };
-  var syntax = esprima.parse(code, parseComment);
+  var syntax = acorn.parse(code, parseOptions);
   traverseTree(ctx, syntax);
   return escodegen.generate(syntax, codegenOptions);
 }

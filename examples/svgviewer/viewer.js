@@ -36,12 +36,14 @@ function renderDocument(pdf, svgLib) {
   }
 }
 
-// In production, the bundled pdf.js shall be used instead of RequireJS.
-require.config({paths: {'pdfjs': '../../src'}});
-require(['pdfjs/display/api', 'pdfjs/display/svg', 'pdfjs/display/global'],
-    function (api, svg, global) {
+Promise.all([System.import('pdfjs/display/api'),
+             System.import('pdfjs/display/svg'),
+             System.import('pdfjs/display/global'),
+             System.resolve('pdfjs/worker_loader')])
+       .then(function (modules) {
+  var api = modules[0], svg = modules[1], global = modules[2];
   // In production, change this to point to the built `pdf.worker.js` file.
-  global.PDFJS.workerSrc = '../../src/worker_loader.js';
+  global.PDFJS.workerSrc = modules[3];
 
   // In production, change this to point to where the cMaps are placed.
   global.PDFJS.cMapUrl = '../../external/bcmaps/';

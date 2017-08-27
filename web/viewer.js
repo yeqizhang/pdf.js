@@ -16,18 +16,18 @@
 
 'use strict';
 
-var DEFAULT_URL = 'compressed.tracemonkey-pldi-09.pdf';
+let DEFAULT_URL = 'compressed.tracemonkey-pldi-09.pdf';
 
 if (typeof PDFJSDev !== 'undefined' && PDFJSDev.test('CHROME')) {
   (function rewriteUrlClosure() {
     // Run this code outside DOMContentLoaded to make sure that the URL
     // is rewritten as soon as possible.
-    var queryString = document.location.search.slice(1);
-    var m = /(^|&)file=([^&]*)/.exec(queryString);
+    let queryString = document.location.search.slice(1);
+    let m = /(^|&)file=([^&]*)/.exec(queryString);
     DEFAULT_URL = m ? decodeURIComponent(m[2]) : '';
 
     // Example: chrome-extension://.../http://example.com/file.pdf
-    var humanReadableUrl = '/' + DEFAULT_URL + location.hash;
+    let humanReadableUrl = '/' + DEFAULT_URL + location.hash;
     history.replaceState(history.state, '', humanReadableUrl);
     if (top === window) {
       chrome.runtime.sendMessage('showPageAction');
@@ -35,19 +35,23 @@ if (typeof PDFJSDev !== 'undefined' && PDFJSDev.test('CHROME')) {
   })();
 }
 
-var pdfjsWebLibs;
+let pdfjsWebApp;
 if (typeof PDFJSDev !== 'undefined' && PDFJSDev.test('PRODUCTION')) {
-  pdfjsWebLibs = {
-    pdfjsWebPDFJS: window.pdfjsDistBuildPdf
-  };
-  (function () {
-//#expand __BUNDLE__
-  }).call(pdfjsWebLibs);
+  pdfjsWebApp = require('./app.js');
 }
 
 if (typeof PDFJSDev !== 'undefined' && PDFJSDev.test('FIREFOX || MOZCENTRAL')) {
-  // FIXME the l10n.js file in the Firefox extension needs global FirefoxCom.
-  window.FirefoxCom = pdfjsWebLibs.pdfjsWebFirefoxCom.FirefoxCom;
+  require('./firefoxcom.js');
+  require('./firefox_print_service.js');
+}
+if (typeof PDFJSDev !== 'undefined' && PDFJSDev.test('GENERIC')) {
+  require('./genericcom.js');
+}
+if (typeof PDFJSDev !== 'undefined' && PDFJSDev.test('CHROME')) {
+  require('./chromecom.js');
+}
+if (typeof PDFJSDev !== 'undefined' && PDFJSDev.test('CHROME || GENERIC')) {
+  require('./pdf_print_service.js');
 }
 
 function getViewerConfiguration() {
@@ -89,7 +93,8 @@ function getViewerConfiguration() {
       lastPageButton: document.getElementById('lastPage'),
       pageRotateCwButton: document.getElementById('pageRotateCw'),
       pageRotateCcwButton: document.getElementById('pageRotateCcw'),
-      toggleHandToolButton: document.getElementById('toggleHandTool'),
+      cursorSelectToolButton: document.getElementById('cursorSelectTool'),
+      cursorHandToolButton: document.getElementById('cursorHandTool'),
       documentPropertiesButton: document.getElementById('documentProperties'),
     },
     fullscreen: {
@@ -122,7 +127,7 @@ function getViewerConfiguration() {
       findResultsCount: document.getElementById('findResultsCount'),
       findStatusIcon: document.getElementById('findStatusIcon'),
       findPreviousButton: document.getElementById('findPrevious'),
-      findNextButton: document.getElementById('findNext')
+      findNextButton: document.getElementById('findNext'),
     },
     passwordOverlay: {
       overlayName: 'passwordOverlay',
@@ -130,7 +135,7 @@ function getViewerConfiguration() {
       label: document.getElementById('passwordText'),
       input: document.getElementById('password'),
       submitButton: document.getElementById('passwordSubmit'),
-      cancelButton: document.getElementById('passwordCancel')
+      cancelButton: document.getElementById('passwordCancel'),
     },
     documentProperties: {
       overlayName: 'documentPropertiesOverlay',
@@ -148,8 +153,8 @@ function getViewerConfiguration() {
         'creator': document.getElementById('creatorField'),
         'producer': document.getElementById('producerField'),
         'version': document.getElementById('versionField'),
-        'pageCount': document.getElementById('pageCountField')
-      }
+        'pageCount': document.getElementById('pageCountField'),
+      },
     },
     errorWrapper: {
       container: document.getElementById('errorWrapper'),
@@ -162,20 +167,24 @@ function getViewerConfiguration() {
     printContainer: document.getElementById('printContainer'),
     openFileInputName: 'fileInput',
     debuggerScriptPath: './debugger.js',
+    defaultUrl: DEFAULT_URL,
   };
 }
 
 function webViewerLoad() {
-  var config = getViewerConfiguration();
+  let config = getViewerConfiguration();
   if (typeof PDFJSDev === 'undefined' || !PDFJSDev.test('PRODUCTION')) {
-    require.config({paths: {'pdfjs': '../src', 'pdfjs-web': '.'}});
-    require(['pdfjs-web/app', 'pdfjs-web/pdf_print_service'], function (web) {
-      window.PDFViewerApplication = web.PDFViewerApplication;
-      web.PDFViewerApplication.run(config);
+    Promise.all([
+      SystemJS.import('pdfjs-web/app'),
+      SystemJS.import('pdfjs-web/genericcom'),
+      SystemJS.import('pdfjs-web/pdf_print_service'),
+    ]).then(function([app, ...otherModules]) {
+      window.PDFViewerApplication = app.PDFViewerApplication;
+      app.PDFViewerApplication.run(config);
     });
   } else {
-    window.PDFViewerApplication = pdfjsWebLibs.pdfjsWebApp.PDFViewerApplication;
-    pdfjsWebLibs.pdfjsWebApp.PDFViewerApplication.run(config);
+    window.PDFViewerApplication = pdfjsWebApp.PDFViewerApplication;
+    pdfjsWebApp.PDFViewerApplication.run(config);
   }
 }
 

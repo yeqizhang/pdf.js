@@ -13,25 +13,8 @@
  * limitations under the License.
  */
 
-'use strict';
-
-(function (root, factory) {
-  if (typeof define === 'function' && define.amd) {
-    define('pdfjs/display/pattern_helper', ['exports', 'pdfjs/shared/util',
-      'pdfjs/display/webgl'], factory);
-  } else if (typeof exports !== 'undefined') {
-    factory(exports, require('../shared/util.js'), require('./webgl.js'));
-  } else {
-    factory((root.pdfjsDisplayPatternHelper = {}), root.pdfjsSharedUtil,
-      root.pdfjsDisplayWebGL);
-  }
-}(this, function (exports, sharedUtil, displayWebGL) {
-
-var Util = sharedUtil.Util;
-var info = sharedUtil.info;
-var isArray = sharedUtil.isArray;
-var error = sharedUtil.error;
-var WebGLUtils = displayWebGL.WebGLUtils;
+import { FormatError, info, isArray, Util } from '../shared/util';
+import { WebGLUtils } from './webgl';
 
 var ShadingIRs = {};
 
@@ -58,9 +41,9 @@ ShadingIRs.RadialAxial = {
           grad.addColorStop(c[0], c[1]);
         }
         return grad;
-      }
+      },
     };
-  }
+  },
 };
 
 var createMeshCanvas = (function createMeshCanvasClosure() {
@@ -157,8 +140,7 @@ var createMeshCanvas = (function createMeshCanvasClosure() {
         }
         break;
       default:
-        error('illigal figure');
-        break;
+        throw new Error('illegal figure');
     }
   }
 
@@ -186,12 +168,12 @@ var createMeshCanvas = (function createMeshCanvasClosure() {
     var scaleY = boundsHeight / height;
 
     var context = {
-      coords: coords,
-      colors: colors,
+      coords,
+      colors,
       offsetX: -offsetX,
       offsetY: -offsetY,
       scaleX: 1 / scaleX,
-      scaleY: 1 / scaleY
+      scaleY: 1 / scaleY,
     };
 
     var paddedWidth = width + BORDER_SIZE * 2;
@@ -229,23 +211,26 @@ var createMeshCanvas = (function createMeshCanvasClosure() {
       canvas = tmpCanvas.canvas;
     }
 
-    return {canvas: canvas,
-            offsetX: offsetX - BORDER_SIZE * scaleX,
-            offsetY: offsetY - BORDER_SIZE * scaleY,
-            scaleX: scaleX, scaleY: scaleY};
+    return {
+      canvas,
+      offsetX: offsetX - BORDER_SIZE * scaleX,
+      offsetY: offsetY - BORDER_SIZE * scaleY,
+      scaleX,
+      scaleY,
+    };
   }
   return createMeshCanvas;
 })();
 
 ShadingIRs.Mesh = {
   fromIR: function Mesh_fromIR(raw) {
-    //var type = raw[1];
+    // var type = raw[1];
     var coords = raw[2];
     var colors = raw[3];
     var figures = raw[4];
     var bounds = raw[5];
     var matrix = raw[6];
-    //var bbox = raw[7];
+    // var bbox = raw[7];
     var background = raw[8];
     return {
       type: 'Pattern',
@@ -283,9 +268,9 @@ ShadingIRs.Mesh = {
                   temporaryPatternCanvas.scaleY);
 
         return ctx.createPattern(temporaryPatternCanvas.canvas, 'no-repeat');
-      }
+      },
     };
-  }
+  },
 };
 
 ShadingIRs.Dummy = {
@@ -294,15 +279,15 @@ ShadingIRs.Dummy = {
       type: 'Pattern',
       getPattern: function Dummy_fromIR_getPattern() {
         return 'hotpink';
-      }
+      },
     };
-  }
+  },
 };
 
 function getShadingPatternFromIR(raw) {
   var shadingIR = ShadingIRs[raw[0]];
   if (!shadingIR) {
-    error('Unknown IR type: ' + raw[0]);
+    throw new Error(`Unknown IR type: ${raw[0]}`);
   }
   return shadingIR.fromIR(raw);
 }
@@ -310,7 +295,7 @@ function getShadingPatternFromIR(raw) {
 var TilingPattern = (function TilingPatternClosure() {
   var PaintType = {
     COLORED: 1,
-    UNCOLORED: 2
+    UNCOLORED: 2,
   };
 
   var MAX_PATTERN_SIZE = 3000; // 10in @ 300dpi shall be enough
@@ -406,7 +391,7 @@ var TilingPattern = (function TilingPatternClosure() {
     },
 
     clipBbox: function clipBbox(graphics, bbox, x0, y0, x1, y1) {
-      if (bbox && isArray(bbox) && bbox.length === 4) {
+      if (isArray(bbox) && bbox.length === 4) {
         var bboxWidth = x1 - x0;
         var bboxHeight = y1 - y0;
         graphics.ctx.rect(x0, y0, bboxWidth, bboxHeight);
@@ -429,7 +414,7 @@ var TilingPattern = (function TilingPatternClosure() {
             context.strokeStyle = cssColor;
             break;
           default:
-            error('Unsupported paint type: ' + paintType);
+            throw new FormatError(`Unsupported paint type: ${paintType}`);
         }
       },
 
@@ -442,12 +427,13 @@ var TilingPattern = (function TilingPatternClosure() {
       this.scaleToContext();
 
       return ctx.createPattern(temporaryPatternCanvas, 'repeat');
-    }
+    },
   };
 
   return TilingPattern;
 })();
 
-exports.getShadingPatternFromIR = getShadingPatternFromIR;
-exports.TilingPattern = TilingPattern;
-}));
+export {
+  getShadingPatternFromIR,
+  TilingPattern,
+};

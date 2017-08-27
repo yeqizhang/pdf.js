@@ -12,20 +12,8 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-'use strict';
 
-(function (root, factory) {
-  if (typeof define === 'function' && define.amd) {
-    define('pdfjs-test/unit/network_spec', ['exports', 'pdfjs/core/network'],
-           factory);
-  } else if (typeof exports !== 'undefined') {
-    factory(exports, require('../../src/core/network.js'));
-  } else {
-    factory((root.pdfjsTestUnitNetworkSpec = {}), root.pdfjsCoreNetwork);
-  }
-}(this, function (exports, coreNetwork) {
-
-var PDFNetworkStream = coreNetwork.PDFNetworkStream;
+import { PDFNetworkStream } from '../../src/display/network';
 
 describe('network', function() {
   var pdf1 = new URL('../pdfs/tracemonkey.pdf', window.location).href;
@@ -40,7 +28,7 @@ describe('network', function() {
         rangeChunkSize: 65536,
         disableStream: true,
       },
-      disableRange: true
+      disableRange: true,
     });
 
     var fullReader = stream.getFullReader();
@@ -63,7 +51,7 @@ describe('network', function() {
       });
     };
 
-    var readPromise = read();
+    var readPromise = Promise.all([read(), promise]);
 
     readPromise.then(function (page) {
       expect(len).toEqual(pdf1Length);
@@ -94,7 +82,7 @@ describe('network', function() {
         rangeChunkSize: 65536,
         disableStream: false,
       },
-      disableRange: false
+      disableRange: false,
     });
 
     var fullReader = stream.getFullReader();
@@ -117,12 +105,13 @@ describe('network', function() {
       });
     };
 
-    var readPromise = read();
+    var readPromise = Promise.all([read(), promise]);
 
     readPromise.then(function () {
       expect(len).toEqual(pdf2Length);
       expect(count).toBeGreaterThan(1);
       expect(isStreamingSupported).toEqual(true);
+      expect(isRangeSupported).toEqual(true);
       done();
     }).catch(function (reason) {
       done.fail(reason);
@@ -140,7 +129,7 @@ describe('network', function() {
         rangeChunkSize: rangeSize,
         disableStream: true,
       },
-      disableRange: false
+      disableRange: false,
     });
 
     var fullReader = stream.getFullReader();
@@ -161,7 +150,7 @@ describe('network', function() {
                                              pdf1Length - tailSize);
     var range2Reader = stream.getRangeReader(pdf1Length - tailSize, pdf1Length);
 
-    var result1 = {value: 0}, result2 = {value: 0};
+    var result1 = { value: 0, }, result2 = { value: 0, };
     var read = function (reader, lenResult) {
       return reader.read().then(function (result) {
         if (result.done) {
@@ -179,6 +168,7 @@ describe('network', function() {
     readPromises.then(function () {
       expect(result1.value).toEqual(rangeSize);
       expect(result2.value).toEqual(tailSize);
+      expect(isStreamingSupported).toEqual(false);
       expect(isRangeSupported).toEqual(true);
       expect(fullReaderCancelled).toEqual(true);
       done();
@@ -187,4 +177,3 @@ describe('network', function() {
     });
   });
 });
-}));
